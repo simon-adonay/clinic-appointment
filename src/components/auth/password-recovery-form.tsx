@@ -33,6 +33,14 @@ export function PasswordRecoveryForm() {
           {state.message}
         </p>
       ) : null}
+      {state.resetUrl ? (
+        <div className="rounded-md border border-clinic-100 bg-clinic-50 p-3 text-sm">
+          <p className="font-semibold text-clinic-700">Development reset link</p>
+          <a className="mt-1 block break-all text-clinic-700 underline" href={state.resetUrl}>
+            {state.resetUrl}
+          </a>
+        </div>
+      ) : null}
       <SubmitButton />
     </form>
   );

@@ -2,6 +2,7 @@
 
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { sendPasswordRecoveryEmail } from "@/lib/email/password-recovery";
@@ -13,6 +14,7 @@ const RESET_TOKEN_TTL_MS = 1000 * 60 * 30;
 type RecoveryState = {
   status: "idle" | "success" | "error";
   message: string;
+  resetUrl?: string;
 };
 
 export async function registerClinic(formData: FormData) {
@@ -74,11 +76,17 @@ export async function requestPasswordRecovery(_state: RecoveryState, formData: F
     }
   });
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const requestHeaders = await headers();
+  const origin = requestHeaders.get("origin");
+  const appUrl = origin ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
   await sendPasswordRecoveryEmail({ to: email, resetUrl });
 
-  return { status: "success", message: genericMessage };
+  return {
+    status: "success",
+    message: genericMessage,
+    resetUrl: process.env.NODE_ENV !== "production" && !process.env.EMAIL_FROM ? resetUrl : undefined
+  };
 }
 
 export async function resetPassword(_state: RecoveryState, formData: FormData): Promise<RecoveryState> {
