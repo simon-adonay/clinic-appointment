@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CLINICIAN
+  STAFF
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum BillingStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  NONE
+}
+
+model User {
+  id                   String    @id @default(cuid())
+  name                 String?
+  email                String    @unique
+  emailVerified        DateTime?
+  image                String?
+  passwordHash         String?
+  passwordResetToken   String?
+  passwordResetExpires DateTime?
+  role                 Role      @default(ADMIN)
+  clinicId             String?
+  clinic               Clinic?   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  accounts             Account[]
+  sessions             Session[]
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([passwordResetToken])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Clinic {
+  id                   String        @id @default(cuid())
+  name                 String
+  slug                 String        @unique
+  stripeCustomerId     String?       @unique
+  stripeSubscriptionId String?       @unique
+  stripePriceId        String?
+  billingStatus        BillingStatus @default(NONE)
+  users                User[]
+  patients             Patient[]
+  appointments         Appointment[]
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+}
+
+model Patient {
+  id           String             @id @default(cuid())
+  clinicId     String
+  firstName    String
+  lastName     String
+  email        String?
+  phone        String?
+  dateOfBirth  DateTime?
+  notes        String?            @db.Text
+  clinic       Clinic             @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+  followUps    FollowUpReminder[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([clinicId, lastName])
+}
+
+model Appointment {
+  id        String             @id @default(cuid())
+  clinicId  String
+  patientId String
+  startsAt  DateTime
+  endsAt    DateTime
+  reason    String
+  status    AppointmentStatus  @default(SCHEDULED)
+  notes     String?            @db.Text
+  clinic    Clinic             @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient   Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  followUps FollowUpReminder[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([clinicId, startsAt])
+  @@index([patientId])
+}
+
+model FollowUpReminder {
+  id            String      @id @default(cuid())
+  clinicId      String
+  patientId     String
+  appointmentId String
+  subject       String
+  message       String      @db.Text
+  recommendedAt DateTime?
+  generatedByAi Boolean     @default(true)
+  patient       Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+
+  @@index([clinicId, createdAt])
+}
